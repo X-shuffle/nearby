@@ -51,7 +51,7 @@ Build the frontend before compiling the production Go executable so the embedded
 
 ```text
 Browser HTTPS / WSS → Cloudflare proxy → HTTP / WS → Nearby container :15789
-                                         Origin port :80
+                                         Origin port :15789
 Chat and files      → Direct browser-to-browser WebRTC connection
 ```
 
@@ -63,7 +63,8 @@ The server needs Bash, curl, Docker Engine, and Docker Compose v2.18+. Node.js a
 
 1. Point your domain's A record at the origin IP and enable Cloudflare's proxy (orange cloud).
 2. Set SSL/TLS encryption mode to **Flexible**, enable **Always Use HTTPS**, and keep **WebSockets** enabled in Network settings. This HTTP-only origin does not use Full or Full (strict) mode.
-3. Place the project on the server and run the command below. The default published HTTP port is 80. Configure your firewall/security group to allow Cloudflare's official IP ranges to reach that port and prevent direct access around the proxy.
+3. Add an **Origin Rule** matching only `nearby.x-shuffle.com` (or your actual hostname) and override **Destination port** to **15789**. Visitors still use standard HTTPS port 443 without a port in the URL. See [Cloudflare destination port overrides](https://developers.cloudflare.com/rules/origin-rules/features/#destination-port).
+4. Place the project on the server and run the command below. The default published HTTP port is 15789. Configure your firewall/security group to allow Cloudflare's official IP ranges to reach that port and prevent direct access around the proxy.
 
 ```sh
 # Replace this with your actual domain.
@@ -100,7 +101,7 @@ Go trusts only the official ranges supplied through `.env.cloudflare` and parses
 - Cloudflare may accept IPv6 visitors even when the origin has only an A record. Such devices may not share a discoverable IPv4 exit; use an invitation link. Nearby does not group devices using a guessed IPv6 prefix.
 - Go returns `Cache-Control: no-store`. Any additional Cloudflare caching rules should bypass `/api/*`. Interrupted WebSocket connections reconnect automatically. See [Cloudflare's WebSocket documentation](https://developers.cloudflare.com/network/websockets/).
 
-If migrating from an older Caddy deployment, stop it with its previous Compose file to release port 80 before starting this version. The script does not automatically delete old containers or volumes.
+For an existing deployment, set `ORIGIN_HTTP_PORT=15789` in `.env` before updating. The script preserves existing configuration and will not overwrite an older value. This service uses origin TCP port 15789 and does not occupy host port 80.
 
 The deployment configuration is provided, but a real cloud deployment has not yet been verified. Container health checks validate the HTTP origin only; the actual domain, Cloudflare proxy, HTTPS certificate, and visitor IP forwarding still need deployment verification.
 

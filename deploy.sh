@@ -36,7 +36,8 @@ usage() {
   ./deploy.sh logs nearby
 
 启动前将域名 A 记录指向服务器，开启橙云，SSL/TLS 使用 Flexible。
-源站只开放 HTTP 80；对外 HTTPS 由 Cloudflare 提供。
+源站只开放 HTTP 15789；对外 HTTPS 由 Cloudflare 提供。
+请为对应域名配置 Origin Rule，将 Destination port 设为 15789。
 脚本不会安装 Docker、拉取项目源码或启用 TURN。
 USAGE
 }
@@ -186,7 +187,7 @@ case "$ACTION" in
     fi
     compose ps
     printf '\n容器已就绪。访问：https://%s\n' "$RESOLVED_DOMAIN"
-    printf '源站仅提供 HTTP；请在 Cloudflare 开启橙云、Flexible 和 Always Use HTTPS。\n';;
+    printf '源站仅提供 HTTP；请在 Cloudflare 开启橙云、Flexible 和 Always Use HTTPS，并将 Origin Rule 回源端口设为实际 ORIGIN_HTTP_PORT（默认 15789）。\n';;
   down) compose down; printf '服务已停止。\n';;
   status) compose ps;;
   logs) if [[ "$SERVICE" == all ]]; then compose logs --tail=100 -f; else compose logs --tail=100 -f "$SERVICE"; fi;;

@@ -44,7 +44,7 @@ make build
 
 ```text
 浏览器 HTTPS / WSS → Cloudflare 橙云 → HTTP / WS → Nearby 容器 :15789
-                                       源站端口 :80
+                                       源站端口 :15789
 设备之间的聊天和文件 → WebRTC 直连（不经过上述 HTTP 服务）
 ```
 
@@ -56,7 +56,8 @@ make build
 
 1. 将域名 A 记录指向源站 IP，并在 Cloudflare DNS 中开启橙云代理。
 2. Cloudflare 的 SSL/TLS 加密模式设为 **Flexible**，开启 **Always Use HTTPS**；Network 中保持 **WebSockets** 开启。此方案源站不监听 HTTPS，不使用 Full / Full (strict) 模式。
-3. 将项目代码放到服务器，执行下方命令；默认发布源站 HTTP 80 端口。防火墙或安全组应允许 Cloudflare 官方 IP 网段访问该端口，避免绕过代理。
+3. 在 Rules → Origin Rules 中新增只匹配 `nearby.x-shuffle.com`（或实际部署域名）的规则，将 **Destination port** 覆盖为 **15789**。此设置仅修改回源端口，对外仍使用标准 HTTPS 443，无需在网址添加端口。[Cloudflare 回源端口说明](https://developers.cloudflare.com/rules/origin-rules/features/#destination-port)
+4. 将项目代码放到服务器，执行下方命令；默认发布源站 HTTP 15789 端口。防火墙或安全组应允许 Cloudflare 官方 IP 网段访问该端口，避免绕过代理。
 
 ```sh
 # 替换成自己的真实域名
@@ -93,7 +94,7 @@ Go 只信任 `.env.cloudflare` 中的官方代理网段，按可信代理链从�
 - Cloudflare 边缘可能接受 IPv6 访客，即使源站只配置 A 记录。IPv6 设备可能无法按共同 IPv4 出口自动归组，可使用邀请链接配对；不按猜测的 IPv6 前缀合并设备。
 - Go 返回 `Cache-Control: no-store`，Cloudflare 的额外缓存规则也应绕过 `/api/*`。WebSocket 断开后会自动重连。[Cloudflare WebSocket 文档](https://developers.cloudflare.com/network/websockets/)
 
-如有旧版 Caddy 部署，先用旧版 Compose 文件停止旧服务以释放 80 端口，再启动新版；本脚本不会自动删除旧容器或数据卷。
+已有部署请将 `.env` 中的 `ORIGIN_HTTP_PORT` 改为 `15789` 后再更新；脚本保留已有 `.env`，不会自动覆盖旧值。服务器只需为本服务开放源站 TCP 15789，不占用已有 HTTP 80 服务。
 
 部署脚本与配置已提供；尚未执行真实云端部署。容器健康检查只验证源站 HTTP 服务，对外 HTTPS、橙云代理、真实客户端 IP 和证书状态需要实际域名验证。
 
