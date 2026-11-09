@@ -1,0 +1,19 @@
+node_modules/
+web/dist/*
+!web/dist/.gitkeep
+bin/
+.cert/
+.env
+.DS_Store
+test-results/
+playwright-report/
+
+.env.cloudflare
+.env.deploy.*
+.cloudflare-ips.*
+__pycache__/
+
+# Keep only non-secret environment templates in version control.
+.env.*
+!.env.example
+!.env.cloudflare.example

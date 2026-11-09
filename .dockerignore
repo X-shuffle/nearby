@@ -1,0 +1,12 @@
+node_modules
+web/dist
+bin
+.git
+.env
+.cert
+test-results
+playwright-report
+
+.env.*
+.cloudflare-ips.*
+__pycache__
