@@ -123,6 +123,17 @@ python3 -m unittest discover -s tests -p 'test_deploy.py' -v
 
 Host candidates are used by default, suitable for local networks that allow devices to communicate. STUN discovers possible public addresses and does not relay files. Cross-network invitations do not guarantee connectivity without a reachable STUN server. Nearby never falls back to TURN.
 
+## Server activity logs
+
+The server writes one JSON record per line to stderr. For Docker deployments, use `./deploy.sh logs nearby`. Records contain a timezone-qualified `time`, `level`, and event name `msg`. Device session records include `ip`, `device_id`, `device_name`, and `platform`. IP resolution follows the same trusted proxy rules as discovery.
+
+- `device.connected` / `device.disconnected`: session start/end, with `reason` and `duration_ms` on disconnect.
+- `device.command`: rename, invitation creation/join, pairing requests/responses/disconnects, and signaling. Includes `action`, `peer_id`, `result`, and `error` on failure. Renames include `new_name`, successful invitation joins include `inviter_id`, and signaling includes only `signal_kind`.
+- `pair.state`: per-device pairing state (`pending`, `accepted`, `rejected`, `expired`, `disconnected`), correlated with the other device through `peer_id`.
+- `device.rejected`, `device.rate_limited`, `device.backpressure`, and `device.transport_error`: connection rejection, rate limiting, full outbound queues, and read/write/keepalive failures. Requests with invalid client IP information record the socket's `remote_addr`.
+
+Successful heartbeats are omitted. Raw payloads, invitation tokens, SDP, and ICE candidate contents are excluded. Chat, file sharing, and file transfers use browser P2P channels; the server cannot observe whether these operations occur or complete. Names and platforms are client-provided; `device_id` identifies the current connection session and changes on reconnect, rather than identifying permanent hardware. Logs retain real source IPs and device information; retention is controlled by the deployment's logging configuration.
+
 ## Network and data boundaries
 
 - **Sharing a public IP does not prove devices are on the same Wi-Fi.** Corporate networks and carrier-grade NAT can group unrelated devices; VPNs, proxies, and IPv6 can prevent discovery. Discovery is not identity verification.

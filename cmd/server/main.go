@@ -19,6 +19,7 @@ import (
 )
 
 func main() {
+	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stderr, nil)))
 	config := httpapi.Config{Origins: split(os.Getenv("ALLOWED_ORIGINS")), DiscoveryURL: os.Getenv("DISCOVERY_WS_URL")}
 	for _, value := range split(os.Getenv("TRUSTED_PROXIES")) {
 		prefix, err := netip.ParsePrefix(value)

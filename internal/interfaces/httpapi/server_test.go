@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"github.com/coder/websocket"
 	"github.com/coder/websocket/wsjson"
+	"log/slog"
 	"nearby/internal/session/application"
 	"nearby/internal/session/infrastructure"
 	"net/http"
@@ -45,7 +46,8 @@ type event struct {
 }
 
 func TestWebSocketLifecycleAndSignalGate(t *testing.T) {
-	s := api()
+	var logs auditBuffer
+	s := New(application.New(infrastructure.NewMemoryRepository()), Config{Logger: slog.New(slog.NewJSONHandler(&logs, nil))})
 	server := httptest.NewServer(s.Handler(fstest.MapFS{"index.html": {Data: []byte("nearby")}}))
 	defer server.Close()
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -101,8 +103,63 @@ func TestWebSocketLifecycleAndSignalGate(t *testing.T) {
 	read(b, "pair.state")
 	write(a, application.Command{Type: "signal", PeerID: bID, Payload: payload})
 	read(b, "signal")
+	write(a, application.Command{Type: "device.rename", Payload: json.RawMessage(`{"name":"renamed"}`)})
+	read(a, "self.updated")
+	read(b, "peer.updated")
+	write(a, application.Command{Type: "invite.create"})
+	invite := read(a, "invite.created")
+	var invitation struct {
+		Token string `json:"token"`
+	}
+	if err := json.Unmarshal(invite.Payload, &invitation); err != nil {
+		t.Fatal(err)
+	}
 	a.CloseNow()
 	read(b, "peer.left")
+	records := logs.records(t)
+	want := map[string]bool{"connected": false, "rejected_signal": false, "accepted_pair": false, "signal": false, "rename": false, "invite": false, "disconnected": false}
+	for _, record := range records {
+		if record["device_id"] != aID {
+			continue
+		}
+		if record["ip"] == "" || record["platform"] == nil || record["time"] == nil {
+			t.Fatalf("missing audit identity/time: %v", record)
+		}
+		if _, err := time.Parse(time.RFC3339Nano, record["time"].(string)); err != nil {
+			t.Fatal(err)
+		}
+		switch record["msg"] {
+		case "device.connected":
+			want["connected"] = record["device_name"] == "a"
+		case "pair.state":
+			if record["status"] == "accepted" && record["peer_id"] == bID {
+				want["accepted_pair"] = true
+			}
+		case "device.disconnected":
+			want["disconnected"] = record["device_name"] == "renamed" && record["duration_ms"] != nil
+		case "device.command":
+			switch record["action"] {
+			case "signal":
+				if record["result"] == "error" {
+					want["rejected_signal"] = record["error"] != nil
+				} else {
+					want["signal"] = record["signal_kind"] == "description" && record["peer_id"] == bID
+				}
+			case "device.rename":
+				want["rename"] = record["new_name"] == "renamed"
+			case "invite.create":
+				want["invite"] = record["device_name"] == "renamed"
+			}
+		}
+	}
+	for name, found := range want {
+		if !found {
+			t.Errorf("missing audit event: %s", name)
+		}
+	}
+	if invitation.Token == "" || strings.Contains(logs.String(), invitation.Token) || strings.Contains(logs.String(), `"sdp"`) {
+		t.Fatal("sensitive payload in audit log")
+	}
 }
 func TestOriginAndHTTPBoundaries(t *testing.T) {
 	s := api()

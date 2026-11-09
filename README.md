@@ -116,6 +116,21 @@ python3 -m unittest discover -s tests -p 'test_deploy.py' -v
 
 默认仅使用主机候选，适合允许互通的局域网。STUN 只是帮助发现可用公网地址，不承载文件，也不是中继。没有配置可达 STUN 时，跨网络邀请并不保证能直连。项目从不自动切换到 TURN。
 
+## 服务端操作日志
+
+服务默认向标准错误输出逐行 JSON 日志，Docker 部署可用 `./deploy.sh logs nearby` 查看。每条日志包含带时区的 `time`、`level` 和事件名 `msg`；设备会话日志包含 `ip`、`device_id`、`device_name`、`platform`。IP 使用与自动发现相同的可信代理解析规则。
+
+```json
+{"time":"2026-11-10T10:00:00+08:00","level":"INFO","msg":"device.command","ip":"203.0.113.7","device_id":"设备会话ID","device_name":"我的手机","platform":"Android","action":"pair.request","peer_id":"对方设备会话ID","result":"ok"}
+```
+
+- `device.connected` / `device.disconnected`：上线、下线；下线带 `reason` 和 `duration_ms`。
+- `device.command`：改名、创建或加入邀请、请求 / 响应 / 断开配对、交换信令；记录 `action`、`peer_id`、`result`，失败时带 `error`。改名带 `new_name`，加入邀请成功带 `inviter_id`，信令仅带 `signal_kind`。
+- `pair.state`：记录双方设备收到的配对状态，包括 `pending`、`accepted`、`rejected`、`expired`、`disconnected`，可按 `peer_id` 关联另一台设备。
+- `device.rejected`、`device.rate_limited`、`device.backpressure`、`device.transport_error`：连接拒绝、限流、发送队列满、读写或保活异常。无法解析 IP 的请求记录原始连接地址 `remote_addr`。
+
+成功心跳不记录。日志不记录原始消息载荷、邀请令牌、SDP 或 ICE 候选内容。聊天、文件共享与文件传输走浏览器 P2P，服务端无法记录这些操作是否发生或完成。设备名称和平台由客户端提供，`device_id` 标识当前连接会话，重连会变化，不能作为永久硬件身份。服务端日志会保留真实来源 IP 和设备信息，保留时间由部署环境的日志配置决定。
+
 ## 网络与数据边界
 
 - **同公网出口不等于同 Wi-Fi**：公司、学校和运营商 CGNAT 可能误分组；VPN、代理、IPv6 可能漏分组。前端明确提示，自动发现不构成身份验证。
